@@ -221,7 +221,7 @@ Events.on(engine,'collisionStart',evt=>{
 function onDown(e){
   e.preventDefault();ensureAudio();
   if(state==='MENU'){startGame();return;}
-  if(state==='LEVEL_END'){level++;startLevel();return;}
+  if(state==='LEVEL_END'&&fireT>=150){level++;startLevel();return;}
   if(state==='GAME_OVER'){startGame();return;}
   if(state==='FLYING'||state==='WAIT')return;
   const p=getPos(e);
@@ -850,7 +850,7 @@ function tick(ts){
   drawHUD();
 
   if(state==='MENU')drawMenu();
-  if(state==='LEVEL_END')drawLevelEnd();
+  if(state==='LEVEL_END'&&fireT>=150)drawLevelEnd();
   if(state==='GAME_OVER')drawGameOver();
 
   ctx.restore();
