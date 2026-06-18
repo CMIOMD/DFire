@@ -97,6 +97,7 @@ let charState='idle', throwT=0;
 let shakeX=0, shakeY=0, waitT=0;
 let particles=[], dumpAlpha=0.92;
 let wind=0, windTarget=0, windStreaks=[];
+let fireT=0, fireParticles=[];
 
 // ── Audio ─────────────────────────────────────────────────────
 let audioCtx;
@@ -171,11 +172,12 @@ function nextItem(){
 }
 function endLevel(){
   score+=Math.round((inDump/perLevel)*2000*level);
-  state='LEVEL_END';
+  fireT=0;state='LEVEL_END';
 }
 function startLevel(){
   liveItems.forEach(li=>World.remove(world,li.body));
   liveItems=[];thrown=0;inDump=0;combo=0;fillPct=0;
+  fireT=0;fireParticles=[];
   perLevel=8+level*2;fillQ();nextItem();
 }
 function startGame(){level=1;score=0;startLevel();}
@@ -624,6 +626,56 @@ function drawWindFlag(){
   if(spd<0.08){ctx.fillStyle='#44cc88';ctx.beginPath();ctx.arc(px,topY+9,5,0,Math.PI*2);ctx.fill();}
 }
 
+// ── Fire ──────────────────────────────────────────────────────
+function updateFire(){
+  if(state!=='LEVEL_END'){fireParticles=[];return;}
+  fireT++;
+  fireParticles=fireParticles.filter(p=>p.life>0);
+  fireParticles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;
+    p.vy-=p.smoke?0.015:0.055;  // rise; flames faster
+    p.vx*=0.97;
+    p.life-=p.smoke?0.014:0.022;
+    p.r*=0.993;
+  });
+  const rate=Math.min(fireT/40,1);
+  if(Math.random()<rate*0.9){
+    const bx=DLX+WT+Math.random()*(DW-WT*2);
+    const cols=['#ff6600','#ff9900','#ffcc00','#ff4400','#ff8800'];
+    fireParticles.push({x:bx,y:DTY+4,vx:(Math.random()-.5)*2.8,vy:-1.8-Math.random()*2.4,
+      life:1,r:5+Math.random()*9,color:cols[Math.floor(Math.random()*cols.length)],smoke:false});
+  }
+  if(Math.random()<rate*0.38){
+    const bx=DLX+WT+Math.random()*(DW-WT*2);
+    fireParticles.push({x:bx,y:DTY-18,vx:(Math.random()-.5)*1.4,vy:-0.9-Math.random()*0.8,
+      life:0.55,r:9+Math.random()*12,color:'#332211',smoke:true});
+  }
+}
+function drawFire(){
+  if(state!=='LEVEL_END'&&fireParticles.length===0)return;
+  // dumpster orange glow overlay — grows with fireT
+  const glow=Math.min(fireT/50,1)*0.45;
+  if(glow>0){
+    ctx.save();ctx.globalAlpha=glow;
+    const fg=ctx.createLinearGradient(DLX,DTY,DLX,DBY);
+    fg.addColorStop(0,'#ff7700');fg.addColorStop(1,'#ff3300');
+    ctx.fillStyle=fg;ctx.fillRect(DLX,DTY,DW,DH);
+    ctx.restore();
+  }
+  // smoke behind flames
+  fireParticles.filter(p=>p.smoke).forEach(p=>{
+    ctx.save();ctx.globalAlpha=p.life*0.38;
+    ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+  // flames
+  fireParticles.filter(p=>!p.smoke).forEach(p=>{
+    ctx.save();ctx.globalAlpha=p.life*0.88;
+    ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+}
+
 // ── HUD ───────────────────────────────────────────────────────
 function drawHUD(){
   const y1=Math.round(GH*0.055), y2=Math.round(GH*0.078);
@@ -755,6 +807,7 @@ function tick(ts){
   Engine.update(engine,dt);
   updateParticles();
   updateWindStreaks();
+  updateFire();
 
   const alphaTarget=(state==='MENU'||state==='LEVEL_END'||state==='GAME_OVER')?0.92:0.25;
   dumpAlpha+=(alphaTarget-dumpAlpha)*.05;
@@ -783,6 +836,7 @@ function tick(ts){
     if(isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
   });
   drawDumpsterFront(dumpAlpha);
+  drawFire();
   drawFillBar();
   liveItems.forEach(li=>{
     if(!isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
