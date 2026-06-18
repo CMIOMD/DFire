@@ -28,6 +28,7 @@ const GH = canvas.height = window.innerHeight;
 const { Engine, Bodies, Body, World, Events } = Matter;
 const engine = Engine.create();
 engine.gravity.y = 1.5;
+engine.gravity.scale = 1 / Math.pow(1000/60, 2); // ~0.0036: physics gravity = 1.5 px/step, matching arcPts
 const world = engine.world;
 
 // ── Layout (all proportional to screen) ───────────────────────
@@ -748,10 +749,10 @@ function tick(ts){
   const dt=Math.min(ts-lastT,50);lastT=ts;
 
   wind+=(windTarget-wind)*0.012;
-  const WIND_ACC=wind*0.07;
+  const WIND_FORCE=wind*0.07/(dt*dt); // dt² cancels Body.update's deltaTimeSquared; net effect = wind*0.07 px/step
   liveItems.forEach(li=>{
     if(!li.body._landed&&li.body.position.y<GH-20)
-      Body.applyForce(li.body,li.body.position,{x:WIND_ACC*li.body.mass,y:0});
+      Body.applyForce(li.body,li.body.position,{x:WIND_FORCE*li.body.mass,y:0});
   });
 
   Engine.update(engine,dt);
