@@ -223,7 +223,7 @@ function onDown(e){
   if(state==='MENU'){startGame();return;}
   if(state==='LEVEL_END'&&fireT>=150){level++;startLevel();return;}
   if(state==='GAME_OVER'){startGame();return;}
-  if(state==='FLYING'||state==='WAIT')return;
+  if(state==='FLYING'||state==='WAIT'||state==='LEVEL_END')return;
   const p=getPos(e);
   if(Math.hypot(p.x-LX,p.y-LY)<140){
     dragging=true;dragPos=clampPull(p.x,p.y);
@@ -849,6 +849,3 @@ function tick(ts){
 }
 requestAnimationFrame(tick);
 
-</script>
-</body>
-</html>
