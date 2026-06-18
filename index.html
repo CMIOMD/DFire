@@ -361,13 +361,7 @@ function drawBG(){
     if(y<GH){ctx.beginPath();ctx.moveTo(DOCK_W,y);ctx.lineTo(GW,y);ctx.stroke();}
   });
 
-  // Lamp post
-  const lampX=DRX-5, lampTop=DTY-38;
-  ctx.strokeStyle='#3a3e48';ctx.lineWidth=4;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(lampX,STEP_Y);ctx.lineTo(lampX,lampTop);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(lampX,lampTop);ctx.lineTo(lampX-44,lampTop);ctx.stroke();
-  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(lampX-48,lampTop+2,7,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(255,230,120,0.9)';ctx.beginPath();ctx.arc(lampX-48,lampTop+2,4,0,Math.PI*2);ctx.fill();
+  // Lamp post removed
 }
 
 // ── Dumpster ──────────────────────────────────────────────────
@@ -614,8 +608,10 @@ function drawWindStreaks(){
   });
 }
 function drawWindFlag(){
-  const px=Math.min(DRX+24,GW-12);
-  const topY=DTY-50,botY=DTY+18;
+  const sx=Math.round((DLX+DRX)/2),sy=Math.round(GH*0.04);
+  const qn=Math.min(queue.length,3);
+  const px=sx+52;
+  const topY=sy+4,botY=sy+qn*50+28;
   ctx.strokeStyle='#888';ctx.lineWidth=3;ctx.lineCap='butt';
   ctx.beginPath();ctx.moveTo(px,topY);ctx.lineTo(px,botY);ctx.stroke();
   const spd=Math.abs(wind),dir=Math.sign(wind)||1;
