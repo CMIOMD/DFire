@@ -609,8 +609,9 @@ function drawWindStreaks(){
 }
 function drawWindFlag(){
   const sx=Math.round((DLX+DRX)/2),sy=Math.round(GH*0.04);
-  const px=sx+52;
-  const topY=sy+6;
+  const qn=Math.min(queue.length,3);
+  const px=sx;
+  const topY=sy+qn*50+42; // below NEXT panel, clear of wind meter
   // short stub pole — only 22px tall, no overlap with items below
   ctx.strokeStyle='#888';ctx.lineWidth=3;ctx.lineCap='butt';
   ctx.beginPath();ctx.moveTo(px,topY);ctx.lineTo(px,topY+22);ctx.stroke();
