@@ -65,8 +65,7 @@ const dumpR  = mkS(DRX + WT/2,    (DTY+DBY)/2, WT,   DH+RIM*2);
 const dumpBt = mkS((DLX+DRX)/2,   DBY + WT/2,  DW,   WT);
 const ground = mkS(GW/2,           GH+25,        GW*2, 50);
 const wallL  = mkS(-25,            GH/2,          50,  GH*2);
-const wallR  = mkS(GW+25,          GH/2,          50,  GH*2);
-World.add(world,[dumpL,dumpR,dumpBt,ground,wallL,wallR]);
+World.add(world,[dumpL,dumpR,dumpBt,ground,wallL]);
 
 // ── Items ─────────────────────────────────────────────────────
 const ITEMS=[
@@ -138,10 +137,13 @@ function clampPull(px,py){
   return {x:LX+dx, y:LY+dy};
 }
 function arcPts(vx,vy,n=80){
-  const pts=[];let x=LX,y=LY,gvy=vy;
+  const pts=[];let x=LX,y=LY,gvy=vy,cvx=vx;
+  const AIR=0.993;
   for(let i=0;i<n;i++){
     if(y>GH+40||x<-40||x>GW+40)break;
-    pts.push({x,y});x+=vx;y+=gvy;gvy+=1.5;
+    pts.push({x,y});
+    gvy+=1.5;cvx*=AIR;gvy*=AIR;
+    x+=cvx;y+=gvy;
   }
   return pts;
 }
