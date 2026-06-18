@@ -95,6 +95,7 @@ let dragging=false, dragPos={x:LX,y:LY};
 let charState='idle', throwT=0;
 let shakeX=0, shakeY=0, waitT=0;
 let particles=[], dumpAlpha=0.92;
+let wind=0, windTarget=0, windStreaks=[];
 
 // ── Audio ─────────────────────────────────────────────────────
 let audioCtx;
@@ -143,6 +144,7 @@ function arcPts(vx,vy,n=80){
     if(y>GH+40||x<-40||x>GW+40)break;
     pts.push({x,y});
     gvy+=1.5;cvx*=AIR;gvy*=AIR;
+    cvx+=wind*0.07;
     x+=cvx;y+=gvy;
   }
   return pts;
@@ -162,6 +164,7 @@ function spawnP(x,y,color,n=8){
 function fillQ(){while(queue.length<5)queue.push(ITEMS[Math.floor(Math.random()*ITEMS.length)]);}
 function nextItem(){
   if(thrown>=perLevel){endLevel();return;}
+  windTarget=(Math.random()*2-1)*Math.min(0.2+level*0.08,1.0);
   fillQ();curDef=queue.shift();
   dragging=false;dragPos={x:LX,y:LY};state='IDLE';
 }
@@ -589,6 +592,40 @@ function drawParticles(){
   ctx.globalAlpha=1;
 }
 
+// ── Wind ──────────────────────────────────────────────────────
+function updateWindStreaks(){
+  windStreaks=windStreaks.filter(s=>s.life>0);
+  windStreaks.forEach(s=>{s.x+=s.vx;s.life-=0.022;});
+  const spd=Math.abs(wind),dir=Math.sign(wind);
+  if(spd>0.08&&Math.random()<spd*0.55){
+    const sx=dir>0?-30:GW+30;
+    windStreaks.push({x:sx,y:Math.random()*GH*0.75+GH*0.04,vx:dir*(2+spd*5),len:18+spd*22,life:1,alpha:0.18+spd*0.3});
+  }
+}
+function drawWindStreaks(){
+  const spd=Math.abs(wind);
+  windStreaks.forEach(s=>{
+    ctx.save();ctx.globalAlpha=s.life*s.alpha;
+    ctx.strokeStyle=spd>0.7?'#ffe0a0':spd>0.4?'#d0e8ff':'#b8d8ff';
+    ctx.lineWidth=1.4;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-s.vx*s.len*0.18,s.y);ctx.stroke();
+    ctx.restore();
+  });
+}
+function drawWindFlag(){
+  const px=Math.min(DRX+24,GW-12);
+  const topY=DTY-50,botY=DTY+18;
+  ctx.strokeStyle='#888';ctx.lineWidth=3;ctx.lineCap='butt';
+  ctx.beginPath();ctx.moveTo(px,topY);ctx.lineTo(px,botY);ctx.stroke();
+  const spd=Math.abs(wind),dir=Math.sign(wind)||1;
+  const wave=Math.sin(Date.now()/160)*4*spd;
+  const flen=(16+spd*22)*dir;
+  const fc=spd>0.7?'#ff4422':spd>0.4?'#ffbb00':'#44cc88';
+  ctx.fillStyle=fc;
+  ctx.beginPath();ctx.moveTo(px,topY+2);ctx.lineTo(px+flen,topY+10+wave);ctx.lineTo(px,topY+20);ctx.closePath();ctx.fill();
+  if(spd<0.08){ctx.fillStyle='#44cc88';ctx.beginPath();ctx.arc(px,topY+10,5,0,Math.PI*2);ctx.fill();}
+}
+
 // ── HUD ───────────────────────────────────────────────────────
 function drawHUD(){
   const y1=Math.round(GH*0.055), y2=Math.round(GH*0.078);
@@ -637,6 +674,25 @@ function drawHUD(){
     ctx.fillText('Drag ↙ down-left to aim',GW/2,hy);
     ctx.fillText('Release to throw →',GW/2,hy+20);
   }
+
+  // Wind meter — top right
+  const wx=GW-14,wy=Math.round(GH*0.055);
+  const mw=60,mh=14;
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(wx-mw,wy-10,mw,mh+12,5);else ctx.rect(wx-mw,wy-10,mw,mh+12);
+  ctx.fill();
+  ctx.fillStyle='#888';ctx.font='9px Arial';ctx.textAlign='right';
+  ctx.fillText('WIND',wx,wy);
+  const bx=wx-mw+4,by=wy+3,bw=mw-8,bh=7;
+  ctx.fillStyle='#333';ctx.fillRect(bx,by,bw,bh);
+  const cx2=bx+bw/2,wfill=wind*(bw/2);
+  const bc=Math.abs(wind)>0.7?'#ff4422':Math.abs(wind)>0.4?'#ffbb00':'#44cc88';
+  ctx.fillStyle=bc;
+  ctx.fillRect(wfill<0?cx2+wfill:cx2,by,Math.abs(wfill),bh);
+  ctx.fillStyle='#555';ctx.fillRect(cx2-1,by,2,bh);
+  ctx.fillStyle='#666';ctx.font='8px Arial';
+  ctx.textAlign='left';ctx.fillText('←',bx-1,by+bh);
+  ctx.textAlign='right';ctx.fillText('→',bx+bw+4,by+bh);
 }
 
 // ── Screens ───────────────────────────────────────────────────
@@ -690,8 +746,17 @@ function drawGameOver(){
 let lastT=0;
 function tick(ts){
   const dt=Math.min(ts-lastT,50);lastT=ts;
+
+  wind+=(windTarget-wind)*0.012;
+  const WIND_ACC=wind*0.07;
+  liveItems.forEach(li=>{
+    if(!li.body._landed&&li.body.position.y<GH-20)
+      Body.applyForce(li.body,li.body.position,{x:WIND_ACC*li.body.mass,y:0});
+  });
+
   Engine.update(engine,dt);
   updateParticles();
+  updateWindStreaks();
 
   const alphaTarget=(state==='MENU'||state==='LEVEL_END'||state==='GAME_OVER')?0.92:0.25;
   dumpAlpha+=(alphaTarget-dumpAlpha)*.05;
@@ -714,6 +779,7 @@ function tick(ts){
   if(Math.abs(shakeX)>.1||Math.abs(shakeY)>.1)ctx.translate(shakeX,shakeY);
 
   drawBG();
+  drawWindStreaks();
   drawDumpsterBack();
   liveItems.forEach(li=>{
     if(isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
@@ -728,6 +794,7 @@ function tick(ts){
   if(state!=='AIMING')drawCurrentItem();
   drawElastic();
   drawArc();
+  drawWindFlag();
   drawHUD();
 
   if(state==='MENU')drawMenu();
