@@ -30,36 +30,36 @@ const engine = Engine.create();
 engine.gravity.y = 1.5;
 const world = engine.world;
 
-// ── Layout (proportional to screen size) ──────────────────────
-// Dumpster: right side, opening at TOP
-const DLX = Math.round(GW * 0.551);
-const DRX = Math.round(Math.min(GW - 20, GW * 0.962));
+// ── Layout (all proportional to screen) ───────────────────────
+// Background ground levels
+const DOCK_Y = Math.round(GH * 0.67);   // elevated dock surface (left)
+const DOCK_W = Math.round(GW * 0.32);   // dock width
+const STEP_Y = Math.round(GH * 0.72);   // asphalt ground (right, lower)
+
+// Character: far left on dock
+const CHAR_CX = Math.round(GW * 0.10);
+const CHAR_CY = DOCK_Y - 44;            // so shadow lands on dock
+const LX      = Math.round(GW * 0.20);  // launch point (character hands)
+const LY      = CHAR_CY - 10;
+
+// Dumpster: right side, grounded on asphalt
+const DBY = STEP_Y - 5;
+const DTY = DBY - Math.round(GH * 0.24);
+const DLX = Math.round(GW * 0.49);
+const DRX = Math.round(GW * 0.92);
 const DW  = DRX - DLX;
-const DTY = Math.round(GH * 0.367);
-const DBY = Math.round(GH * 0.587);
 const DH  = DBY - DTY;
 const WT  = 10, RIM = 16;
 const P3X = 10, P3Y = -14;
 
-// Character: left side, elevated dock
-const CHAR_CX = Math.round(GW * 0.308);
-const CHAR_CY = Math.round(GH * 0.533);
-const LX = Math.round(GW * 0.423);
-const LY = Math.round(GH * 0.521);
-
-// Slingshot
-const MAX_PX = Math.round(GW * 0.231);
-const MAX_PY = Math.round(GH * 0.154);
-const FACTOR_X = 0.048;
+// Slingshot — FACTOR_X increased to compensate for larger throw distance
+const MAX_PX = Math.round(GW * 0.22);
+const MAX_PY = Math.min(Math.round(GH * 0.18), 110); // capped so arc stays visible
+const FACTOR_X = 0.085;
 const FACTOR_Y = 0.25;
 
-// Background layout
-const DOCK_Y = Math.round(GH * 0.581);
-const DOCK_W = Math.round(GW * 0.482);
-const STEP_Y = Math.round(GH * 0.604);
-
 // ── Physics Bodies ────────────────────────────────────────────
-const mkS=(x,y,w,h)=>Bodies.rectangle(x,y,w,h,{isStatic:true,friction:0.65,restitution:0.18});
+const mkS = (x,y,w,h) => Bodies.rectangle(x,y,w,h,{isStatic:true,friction:0.65,restitution:0.18});
 const dumpL  = mkS(DLX - WT/2,    (DTY+DBY)/2, WT,   DH+RIM*2);
 const dumpR  = mkS(DRX + WT/2,    (DTY+DBY)/2, WT,   DH+RIM*2);
 const dumpBt = mkS((DLX+DRX)/2,   DBY + WT/2,  DW,   WT);
@@ -80,12 +80,12 @@ const ITEMS=[
   {name:'Barrel',shape:'c',r:21,hl:'#883300'},
 ];
 
-// ── Stars (seeded — must be after GW/GH) ─────────────────────
-const STARS=Array.from({length:28},(_,i)=>({
-  x:((i*137+53)%GW),
-  y:((i*97+31)%Math.round(GH*0.35))+10,
-  r:0.7+((i*31)%10)/14,
-  a:0.25+((i*53)%10)/22,
+// ── Stars (after GW/GH) ───────────────────────────────────────
+const STARS = Array.from({length:28},(_,i)=>({
+  x: ((i*137+53) % GW),
+  y: ((i*97+31)  % Math.round(GH*0.30)) + 8,
+  r: 0.7+((i*31)%10)/14,
+  a: 0.25+((i*53)%10)/22,
 }));
 
 // ── State ─────────────────────────────────────────────────────
@@ -126,18 +126,18 @@ function sfxSuccess(){ensureAudio();[550,750,1000].forEach((f,i)=>setTimeout(()=
 // ── Helpers ───────────────────────────────────────────────────
 function getPos(e){
   const r=canvas.getBoundingClientRect();
-  const sx=GW/r.width,sy=GH/r.height;
+  const sx=GW/r.width, sy=GH/r.height;
   const s=e.touches?e.touches[0]:e;
-  return{x:(s.clientX-r.left)*sx,y:(s.clientY-r.top)*sy};
+  return {x:(s.clientX-r.left)*sx, y:(s.clientY-r.top)*sy};
 }
-function pullVec(){return{dx:LX-dragPos.x,dy:LY-dragPos.y};}
-function throwVel(){const{dx,dy}=pullVec();return{vx:dx*FACTOR_X,vy:dy*FACTOR_Y};}
+function pullVec(){return {dx:LX-dragPos.x, dy:LY-dragPos.y};}
+function throwVel(){const{dx,dy}=pullVec();return {vx:dx*FACTOR_X, vy:dy*FACTOR_Y};}
 function clampPull(px,py){
-  const dx=Math.max(-MAX_PX,Math.min(MAX_PX*0.1,px-LX));
-  const dy=Math.max(-MAX_PY*0.1,Math.min(MAX_PY,py-LY));
-  return{x:LX+dx,y:LY+dy};
+  const dx=Math.max(-MAX_PX, Math.min(MAX_PX*0.1, px-LX));
+  const dy=Math.max(-MAX_PY*0.1, Math.min(MAX_PY, py-LY));
+  return {x:LX+dx, y:LY+dy};
 }
-function arcPts(vx,vy,n=70){
+function arcPts(vx,vy,n=80){
   const pts=[];let x=LX,y=LY,gvy=vy;
   for(let i=0;i<n;i++){
     if(y>GH+40||x<-40||x>GW+40)break;
@@ -151,7 +151,7 @@ function isInDump(b){
 }
 function spawnP(x,y,color,n=8){
   for(let i=0;i<n;i++){
-    const a=Math.random()*Math.PI*2,s=1.5+Math.random()*3.5;
+    const a=Math.random()*Math.PI*2, s=1.5+Math.random()*3.5;
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.2,life:1,color,r:2+Math.random()*3});
   }
 }
@@ -217,7 +217,7 @@ function onDown(e){
   if(state==='GAME_OVER'){startGame();return;}
   if(state==='FLYING'||state==='WAIT')return;
   const p=getPos(e);
-  if(Math.hypot(p.x-LX,p.y-LY)<130){
+  if(Math.hypot(p.x-LX,p.y-LY)<140){
     dragging=true;dragPos=clampPull(p.x,p.y);
     charState='aiming';state='AIMING';
   }
@@ -323,50 +323,45 @@ function drawItem(def,x,y,angle,alpha){
 
 // ── Background ────────────────────────────────────────────────
 function drawBG(){
-  // Sky
   const bg=ctx.createLinearGradient(0,0,0,GH);
   bg.addColorStop(0,'#060a12');bg.addColorStop(0.55,'#0a1020');bg.addColorStop(1,'#0d1428');
   ctx.fillStyle=bg;ctx.fillRect(0,0,GW,GH);
 
-  // Stars
   STARS.forEach(s=>{
     ctx.globalAlpha=s.a;ctx.fillStyle='#fff';
     ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
   });
   ctx.globalAlpha=1;
 
-  // Floodlight glow above dumpster
-  const glCX=(DLX+DRX)/2, glCY=DTY-45;
-  const gl=ctx.createRadialGradient(glCX,glCY,0,glCX,glCY,95);
+  // Floodlight above dumpster
+  const glCX=(DLX+DRX)/2, glCY=DTY-40;
+  const gl=ctx.createRadialGradient(glCX,glCY,0,glCX,glCY,100);
   gl.addColorStop(0,'rgba(255,220,100,0.14)');gl.addColorStop(1,'rgba(255,220,100,0)');
-  ctx.fillStyle=gl;ctx.beginPath();ctx.arc(glCX,glCY,95,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=gl;ctx.beginPath();ctx.arc(glCX,glCY,100,0,Math.PI*2);ctx.fill();
 
-  // Loading dock platform (left side, raised)
+  // Dock platform (left, elevated)
   ctx.fillStyle='#252830';ctx.fillRect(0,DOCK_Y,DOCK_W,GH-DOCK_Y);
-  // Dock surface edge strip
   const trim=ctx.createLinearGradient(0,DOCK_Y-2,0,DOCK_Y+5);
   trim.addColorStop(0,'#5a6070');trim.addColorStop(1,'#2a2e38');
   ctx.fillStyle=trim;ctx.fillRect(0,DOCK_Y-2,DOCK_W,7);
-  // Dock face (vertical step down)
+  // Step face
   ctx.fillStyle='#1e2128';ctx.fillRect(DOCK_W-3,DOCK_Y,5,STEP_Y-DOCK_Y);
 
-  // Asphalt ground (right side, slightly lower)
+  // Asphalt (right, lower)
   ctx.fillStyle='#1a1d22';ctx.fillRect(DOCK_W,STEP_Y,GW-DOCK_W,GH-STEP_Y);
-  // Asphalt texture lines
   ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;
-  [.628,.658,.687,.729,.782,.841,.901].forEach(t=>{
+  [.76,.80,.84,.88,.93,.97].forEach(t=>{
     const y=Math.round(GH*t);
     if(y<GH){ctx.beginPath();ctx.moveTo(DOCK_W,y);ctx.lineTo(GW,y);ctx.stroke();}
   });
 
-  // Lamp post above dumpster
-  const lampX=DRX-5, lampTop=DTY-42;
+  // Lamp post
+  const lampX=DRX-5, lampTop=DTY-38;
   ctx.strokeStyle='#3a3e48';ctx.lineWidth=4;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(lampX,STEP_Y);ctx.lineTo(lampX,lampTop);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(lampX,lampTop);ctx.lineTo(lampX-47,lampTop);ctx.stroke();
-  // Lamp head
-  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(lampX-51,lampTop+2,7,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(255,230,120,0.9)';ctx.beginPath();ctx.arc(lampX-51,lampTop+2,4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(lampX,lampTop);ctx.lineTo(lampX-44,lampTop);ctx.stroke();
+  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(lampX-48,lampTop+2,7,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,230,120,0.9)';ctx.beginPath();ctx.arc(lampX-48,lampTop+2,4,0,Math.PI*2);ctx.fill();
 }
 
 // ── Dumpster ──────────────────────────────────────────────────
@@ -375,7 +370,6 @@ function drawDumpsterBack(){
   ig.addColorStop(0,'#07100a');ig.addColorStop(1,'#101c0e');
   ctx.fillStyle=ig;ctx.fillRect(DLX+WT,DTY,DW-WT*2,DH);
 
-  // Right-side 3D face
   ctx.beginPath();
   ctx.moveTo(DRX,DTY);ctx.lineTo(DRX+P3X,DTY+P3Y);
   ctx.lineTo(DRX+P3X,DBY+P3Y);ctx.lineTo(DRX,DBY);
@@ -385,7 +379,6 @@ function drawDumpsterBack(){
   ctx.fillStyle=rg;ctx.fill();
   ctx.strokeStyle='#0c1c0a';ctx.lineWidth=1.5;ctx.stroke();
 
-  // Top rim parallelogram
   ctx.beginPath();
   ctx.moveTo(DLX,DTY);ctx.lineTo(DLX+P3X,DTY+P3Y);
   ctx.lineTo(DRX+P3X,DTY+P3Y);ctx.lineTo(DRX,DTY);
@@ -400,28 +393,23 @@ function drawDumpsterFront(alpha){
   ctx.save();ctx.globalAlpha=alpha;
   const cx=(DLX+DRX)/2;
 
-  // Main body gradient
   const bg=ctx.createLinearGradient(DLX,0,DRX,0);
   bg.addColorStop(0,'#284e24');bg.addColorStop(.1,'#3a6c34');
   bg.addColorStop(.5,'#3e7038');bg.addColorStop(.9,'#3a6c34');bg.addColorStop(1,'#223c1e');
   ctx.fillStyle=bg;ctx.fillRect(DLX,DTY,DW,DH);
 
-  // Top rim lip
   const rl=ctx.createLinearGradient(0,DTY,0,DTY+RIM);
   rl.addColorStop(0,'#62985a');rl.addColorStop(1,'#284e24');
   ctx.fillStyle=rl;ctx.fillRect(DLX,DTY,DW,RIM);
 
-  // Vertical ribs
   [.08,.2,.34,.5,.66,.8,.92].forEach((t,i)=>{
     ctx.fillStyle=i%2===0?'rgba(0,0,0,0.20)':'rgba(255,255,255,0.05)';
     ctx.fillRect(DLX+DW*t-2,DTY+RIM,4,DH-RIM);
   });
 
-  // Horizontal dents
   ctx.fillStyle='rgba(0,0,0,0.16)';
   [.26,.52].forEach(t=>ctx.fillRect(DLX+6,DTY+RIM+(DH-RIM)*t,DW-12,6));
 
-  // Amber hazard stripe
   const sy=DTY+RIM+(DH-RIM)*.64, sh=28;
   ctx.fillStyle='#f0a800';ctx.fillRect(DLX+5,sy,DW-10,sh);
   ctx.save();ctx.beginPath();ctx.rect(DLX+5,sy,DW-10,sh);ctx.clip();
@@ -434,12 +422,10 @@ function drawDumpsterFront(alpha){
   }
   ctx.restore();
 
-  // DUMPSTER stencil
   ctx.globalAlpha=Math.min(1,alpha*4);
   ctx.fillStyle='#0d180a';ctx.font='bold 12px "Arial Black",Arial';ctx.textAlign='center';
   ctx.fillText('DUMPSTER',cx,sy-7);
 
-  // Rivets
   ctx.globalAlpha=alpha;
   ctx.fillStyle='#507840';
   [[DLX+12,DTY+10],[cx,DTY+10],[DRX-12,DTY+10],
@@ -448,23 +434,19 @@ function drawDumpsterFront(alpha){
     ctx.strokeStyle='#2a4820';ctx.lineWidth=1;ctx.stroke();
   });
 
-  // Paint chips
-  [[DLX+28,DTY+50,14,4,'rgba(0,0,0,0.4)','#1a3818'],
-   [DRX-40,DBY-72, 9,3,'rgba(0,0,0,0.4)','#1a3818'],
-   [cx-20,  DTY+36,16,5,'rgba(0,0,0,0.35)','#1a3818']].forEach(([x,y,w,h,shadow,base])=>{
+  [[DLX+28,DTY+40,14,4,'rgba(0,0,0,0.4)','#1a3818'],
+   [DRX-40,DBY-55, 9,3,'rgba(0,0,0,0.4)','#1a3818'],
+   [cx-20,  DTY+28,16,5,'rgba(0,0,0,0.35)','#1a3818']].forEach(([x,y,w,h,shadow,base])=>{
     ctx.fillStyle=shadow;ctx.fillRect(x,y,w,h);
     ctx.fillStyle=base;ctx.fillRect(x+1,y+1,w-2,h-2);
   });
 
-  // Bottom rim
   const br=ctx.createLinearGradient(0,DBY-8,0,DBY);
   br.addColorStop(0,'#284e24');br.addColorStop(1,'#162c14');
   ctx.fillStyle=br;ctx.fillRect(DLX,DBY-8,DW,8);
 
-  // Outer border
   ctx.strokeStyle='#0c1c0a';ctx.lineWidth=2.5;ctx.strokeRect(DLX,DTY,DW,DH);
 
-  // Gameplay hint border (transparent mode)
   if(alpha<0.4){
     ctx.globalAlpha=0.55;ctx.strokeStyle='#44ff88';ctx.lineWidth=1.5;
     ctx.setLineDash([6,8]);ctx.strokeRect(DLX+2,DTY+2,DW-4,DH-4);ctx.setLineDash([]);
@@ -479,7 +461,7 @@ function drawFillBar(){
   inside.forEach(({def})=>{area+=def.shape==='c'?Math.PI*def.r*def.r:def.w*def.h;});
   fillPct=Math.min(1,area/(DW*DH*.75));
 
-  const bx=DLX-18,by=DTY,bh=DH;
+  const bx=DLX-15, by=DTY, bh=DH;
   ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(bx,by,9,bh);
   if(fillPct>0){
     const fh=bh*fillPct;
@@ -494,7 +476,7 @@ function drawFillBar(){
 
 // ── Character ─────────────────────────────────────────────────
 function drawCharacter(){
-  const cx=CHAR_CX,cy=CHAR_CY,HR=22;
+  const cx=CHAR_CX, cy=CHAR_CY, HR=22;
   const shirt=charState==='aiming'?'#cc2222':charState==='throwing'?'#22aa44':'#2255cc';
 
   ctx.fillStyle='rgba(0,0,0,0.35)';
@@ -504,15 +486,15 @@ function drawCharacter(){
 
   ctx.strokeStyle='#f5c587';ctx.lineWidth=7;ctx.lineCap='round';
   if(charState==='throwing'){
-    ctx.beginPath();ctx.moveTo(cx-8,cy+HR+6);ctx.lineTo(cx+18,cy-8);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx+8,cy+HR+6);ctx.lineTo(cx+34,cy-2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-8,cy+HR+6);ctx.lineTo(cx+22,cy-6);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+8,cy+HR+6);ctx.lineTo(cx+36,cy);ctx.stroke();
   } else if(charState==='aiming'){
     const ang=Math.atan2(dragPos.y-cy,dragPos.x-cx);
     ctx.beginPath();ctx.moveTo(cx-6,cy+HR+6);ctx.lineTo(cx+Math.cos(ang)*30-6,cy+Math.sin(ang)*30+HR+6);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cx+6,cy+HR+6);ctx.lineTo(cx+Math.cos(ang)*30+6,cy+Math.sin(ang)*30+HR+6);ctx.stroke();
   } else {
-    ctx.beginPath();ctx.moveTo(cx-8,cy+HR+6);ctx.lineTo(cx-24,cy+HR+26);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx+8,cy+HR+6);ctx.lineTo(cx+24,cy+HR+26);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-8,cy+HR+6);ctx.lineTo(cx-22,cy+HR+26);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+8,cy+HR+6);ctx.lineTo(cx+22,cy+HR+26);ctx.stroke();
   }
 
   ctx.strokeStyle='#334466';ctx.lineWidth=8;ctx.lineCap='round';
@@ -567,8 +549,8 @@ function drawCharacter(){
 function drawElastic(){
   if(!dragging||state!=='AIMING')return;
   ctx.strokeStyle='#d4aa20';ctx.lineWidth=3;ctx.lineCap='round';ctx.setLineDash([]);
-  const a1x=CHAR_CX+14,a1y=LY-8;
-  const a2x=CHAR_CX+28,a2y=LY+4;
+  const a1x=CHAR_CX+16, a1y=LY-6;
+  const a2x=CHAR_CX+30, a2y=LY+6;
   ctx.beginPath();ctx.moveTo(a1x,a1y);ctx.lineTo(dragPos.x,dragPos.y);ctx.lineTo(a2x,a2y);ctx.stroke();
   if(curDef)drawItem(curDef,dragPos.x,dragPos.y,0);
 }
@@ -603,94 +585,99 @@ function drawParticles(){
 
 // ── HUD ───────────────────────────────────────────────────────
 function drawHUD(){
-  const hudY1=Math.round(GH*0.052);
-  const hudY2=Math.round(GH*0.073);
+  const y1=Math.round(GH*0.055), y2=Math.round(GH*0.078);
 
-  ctx.fillStyle='#ffd700';ctx.font='bold 30px Arial';ctx.textAlign='left';
-  ctx.fillText(score.toLocaleString(),14,hudY1);
-  ctx.fillStyle='#aaa';ctx.font='13px Arial';ctx.fillText('LVL '+level,14,hudY2);
+  // Score / level (top left)
+  ctx.fillStyle='#ffd700';ctx.font='bold 28px Arial';ctx.textAlign='left';
+  ctx.fillText(score.toLocaleString(),12,y1);
+  ctx.fillStyle='#aaa';ctx.font='12px Arial';ctx.fillText('LVL '+level,12,y2);
 
-  ctx.textAlign='right';ctx.fillStyle='#ccc';ctx.font='13px Arial';
-  ctx.fillText(thrown+'/'+perLevel+' thrown',GW-14,hudY1);
+  // Thrown / in dumpster (top left, below score)
+  ctx.fillStyle='#ccc';ctx.font='12px Arial';
+  ctx.fillText(thrown+'/'+perLevel+' thrown',12,y2+18);
   ctx.fillStyle=inDump>0?'#44ff88':'#ff6666';
-  ctx.fillText(inDump+' in dumpster',GW-14,hudY2);
+  ctx.fillText(inDump+' in dumpster',12,y2+34);
 
+  // Combo
   if(combo>=2){
     ctx.textAlign='center';
     const pulse=1+.07*Math.sin(Date.now()/100);
-    ctx.save();ctx.translate(GW/2,Math.round(GH*0.097));ctx.scale(pulse,pulse);
-    ctx.fillStyle='#ff9900';ctx.font='bold '+(18+combo*2)+'px Arial';
+    ctx.save();ctx.translate(LX+Math.round((DLX-LX)/2), Math.round(GH*0.10));ctx.scale(pulse,pulse);
+    ctx.fillStyle='#ff9900';ctx.font='bold '+(16+combo*2)+'px Arial';
     ctx.fillText(combo+'× COMBO!',0,0);ctx.restore();
   }
 
-  // NEXT panel (top right, above dumpster)
-  const sx=GW-74, sy=Math.round(GH*0.092);
+  // NEXT panel — centered above dumpster
+  const sx=Math.round((DLX+DRX)/2), sy=Math.round(GH*0.04);
   const qn=Math.min(queue.length,3);
   ctx.fillStyle='rgba(0,0,0,0.6)';
   ctx.beginPath();
-  if(ctx.roundRect)ctx.roundRect(sx-8,sy-18,70,qn*54+38,8);
-  else ctx.rect(sx-8,sy-18,70,qn*54+38);
+  if(ctx.roundRect)ctx.roundRect(sx-43,sy,86,qn*50+34,8);
+  else ctx.rect(sx-43,sy,86,qn*50+34);
   ctx.fill();
-  ctx.fillStyle='#666';ctx.font='11px Arial';ctx.textAlign='center';ctx.fillText('NEXT',sx+27,sy-2);
+  ctx.fillStyle='#888';ctx.font='11px Arial';ctx.textAlign='center';
+  ctx.fillText('NEXT',sx,sy+14);
   queue.slice(0,3).forEach((def,i)=>{
-    ctx.save();ctx.scale(.65,.65);drawItem(def,(sx+27)/.65,(sy+20+i*54)/.65,0);ctx.restore();
-    ctx.fillStyle='#666';ctx.font='9px Arial';ctx.textAlign='center';ctx.fillText(def.name,sx+27,sy+36+i*54);
+    ctx.save();ctx.scale(.6,.6);drawItem(def,sx/.6,(sy+32+i*50)/.6,0);ctx.restore();
+    ctx.fillStyle='#666';ctx.font='9px Arial';ctx.textAlign='center';
+    ctx.fillText(def.name,sx,sy+48+i*50);
   });
 
+  // Tutorial hint
   if(level===1&&(state==='IDLE'||state==='AIMING')){
-    ctx.textAlign='center';ctx.fillStyle='rgba(180,210,255,0.75)';
-    ctx.font='13px Arial';
-    const hy=Math.round(GH*0.65);
-    ctx.fillText('Drag ↙ left+down to aim',GW/2-20,hy);
-    ctx.fillText('Release to throw →',GW/2-20,hy+18);
+    ctx.textAlign='center';ctx.fillStyle='rgba(180,210,255,0.80)';
+    ctx.font='14px Arial';
+    const hy=Math.round(GH*0.50);
+    ctx.fillText('Drag ↙ down-left to aim',GW/2,hy);
+    ctx.fillText('Release to throw →',GW/2,hy+20);
   }
 }
 
 // ── Screens ───────────────────────────────────────────────────
 function drawMenu(){
-  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,GW,GH);
+  ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,GW,GH);
   ctx.textAlign='center';
-  ctx.font='52px Arial';ctx.fillText('🔥',GW/2,GH*.26);
-  ctx.fillStyle='#ffd700';ctx.font='bold 52px "Arial Black",Arial';ctx.fillText('DFIRE',GW/2,GH*.37);
-  ctx.fillStyle='#ff8c00';ctx.font='bold 20px Arial';ctx.fillText('Dumpster Toss',GW/2,GH*.435);
-  ctx.fillStyle='#ccc';ctx.font='15px Arial';
-  ctx.fillText('Drag ↙ left+down to aim',GW/2,GH*.505);
-  ctx.fillText('Pack items for bonus points!',GW/2,GH*.545);
+  ctx.font='48px Arial';ctx.fillText('🔥',GW/2,GH*.24);
+  ctx.fillStyle='#ffd700';ctx.font='bold 50px "Arial Black",Arial';ctx.fillText('DFIRE',GW/2,GH*.36);
+  ctx.fillStyle='#ff8c00';ctx.font='bold 19px Arial';ctx.fillText('Dumpster Toss',GW/2,GH*.425);
+  ctx.fillStyle='#ccc';ctx.font='14px Arial';
+  ctx.fillText('Drag ↙ down-left to aim',GW/2,GH*.495);
+  ctx.fillText('Pack items for bonus points!',GW/2,GH*.535);
   ctx.fillStyle='#ff6600';
   ctx.beginPath();
-  if(ctx.roundRect)ctx.roundRect(GW/2-100,GH*.61,200,56,28);
-  else ctx.rect(GW/2-100,GH*.61,200,56);
+  if(ctx.roundRect)ctx.roundRect(GW/2-95,GH*.60,190,54,27);
+  else ctx.rect(GW/2-95,GH*.60,190,54);
   ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 22px Arial';ctx.fillText('PLAY NOW',GW/2,GH*.61+36);
+  ctx.fillStyle='#fff';ctx.font='bold 21px Arial';ctx.fillText('PLAY NOW',GW/2,GH*.60+35);
 }
 function drawLevelEnd(){
   ctx.fillStyle='rgba(0,0,10,0.80)';ctx.fillRect(0,0,GW,GH);
   ctx.textAlign='center';
-  ctx.fillStyle='#ffd700';ctx.font='bold 38px Arial';ctx.fillText('LEVEL '+level+' CLEAR!',GW/2,GH/2-70);
-  ctx.fillStyle='#fff';ctx.font='20px Arial';ctx.fillText(inDump+'/'+perLevel+' items packed',GW/2,GH/2-28);
+  ctx.fillStyle='#ffd700';ctx.font='bold 36px Arial';ctx.fillText('LEVEL '+level+' CLEAR!',GW/2,GH/2-65);
+  ctx.fillStyle='#fff';ctx.font='19px Arial';ctx.fillText(inDump+'/'+perLevel+' items packed',GW/2,GH/2-26);
   const pct=Math.round(inDump/perLevel*100);
   ctx.fillStyle=pct>=70?'#44ff88':pct>=40?'#ffaa00':'#ff4444';
-  ctx.font='bold 26px Arial';ctx.fillText(pct+'% fill rate',GW/2,GH/2+12);
-  ctx.fillStyle='#ffd700';ctx.font='20px Arial';ctx.fillText('Score: '+score.toLocaleString(),GW/2,GH/2+46);
+  ctx.font='bold 25px Arial';ctx.fillText(pct+'% fill rate',GW/2,GH/2+12);
+  ctx.fillStyle='#ffd700';ctx.font='19px Arial';ctx.fillText('Score: '+score.toLocaleString(),GW/2,GH/2+44);
   ctx.fillStyle='#ff6600';
   ctx.beginPath();
-  if(ctx.roundRect)ctx.roundRect(GW/2-95,GH/2+68,190,52,26);
-  else ctx.rect(GW/2-95,GH/2+68,190,52);
+  if(ctx.roundRect)ctx.roundRect(GW/2-90,GH/2+66,180,50,25);
+  else ctx.rect(GW/2-90,GH/2+66,180,50);
   ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 19px Arial';ctx.fillText('NEXT LEVEL ▶',GW/2,GH/2+101);
+  ctx.fillStyle='#fff';ctx.font='bold 18px Arial';ctx.fillText('NEXT LEVEL ▶',GW/2,GH/2+98);
 }
 function drawGameOver(){
   ctx.fillStyle='rgba(0,0,0,0.85)';ctx.fillRect(0,0,GW,GH);
   ctx.textAlign='center';
-  ctx.fillStyle='#ff3333';ctx.font='bold 44px Arial';ctx.fillText('GAME OVER',GW/2,GH/2-68);
-  ctx.fillStyle='#fff';ctx.font='20px Arial';ctx.fillText('Final Score',GW/2,GH/2-28);
-  ctx.fillStyle='#ffd700';ctx.font='bold 36px Arial';ctx.fillText(score.toLocaleString(),GW/2,GH/2+12);
+  ctx.fillStyle='#ff3333';ctx.font='bold 42px Arial';ctx.fillText('GAME OVER',GW/2,GH/2-65);
+  ctx.fillStyle='#fff';ctx.font='19px Arial';ctx.fillText('Final Score',GW/2,GH/2-26);
+  ctx.fillStyle='#ffd700';ctx.font='bold 34px Arial';ctx.fillText(score.toLocaleString(),GW/2,GH/2+12);
   ctx.fillStyle='#ff6600';
   ctx.beginPath();
-  if(ctx.roundRect)ctx.roundRect(GW/2-95,GH/2+48,190,52,26);
-  else ctx.rect(GW/2-95,GH/2+48,190,52);
+  if(ctx.roundRect)ctx.roundRect(GW/2-90,GH/2+46,180,50,25);
+  else ctx.rect(GW/2-90,GH/2+46,180,50);
   ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 19px Arial';ctx.fillText('PLAY AGAIN',GW/2,GH/2+81);
+  ctx.fillStyle='#fff';ctx.font='bold 18px Arial';ctx.fillText('PLAY AGAIN',GW/2,GH/2+78);
 }
 
 // ── Main Loop ─────────────────────────────────────────────────
@@ -722,18 +709,14 @@ function tick(ts){
 
   drawBG();
   drawDumpsterBack();
-
   liveItems.forEach(li=>{
     if(isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
   });
-
   drawDumpsterFront(dumpAlpha);
   drawFillBar();
-
   liveItems.forEach(li=>{
     if(!isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
   });
-
   drawParticles();
   drawCharacter();
   if(state!=='AIMING')drawCurrentItem();
