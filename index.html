@@ -6,8 +6,8 @@
 <title>Dumpster Toss</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none; }
-body { background:#0a0a1a; display:flex; justify-content:center; align-items:center; height:100vh; overflow:hidden; }
-#gameCanvas { display:block; }
+body { background:#0a0a1a; margin:0; padding:0; overflow:hidden; }
+#gameCanvas { display:block; position:fixed; top:0; left:0; }
 </style>
 </head>
 <body>
@@ -22,38 +22,50 @@ body { background:#0a0a1a; display:flex; justify-content:center; align-items:cen
 'use strict';
 const canvas = document.getElementById('gameCanvas');
 const ctx    = canvas.getContext('2d');
-const GW = canvas.width  = 390;
-const GH = canvas.height = 844;
+const GW = canvas.width  = window.innerWidth;
+const GH = canvas.height = window.innerHeight;
 
 const { Engine, Bodies, Body, World, Events } = Matter;
 const engine = Engine.create();
 engine.gravity.y = 1.5;
 const world = engine.world;
 
-// ── Layout ────────────────────────────────────────────────────
+// ── Layout (proportional to screen size) ──────────────────────
 // Dumpster: right side, opening at TOP
-const DLX=215, DRX=375, DW=160;
-const DTY=310, DBY=495, DH=185;
-const WT=10, RIM=16;
-const P3X=10, P3Y=-14;  // 3D depth (right-side parallelogram)
+const DLX = Math.round(GW * 0.551);
+const DRX = Math.round(Math.min(GW - 20, GW * 0.962));
+const DW  = DRX - DLX;
+const DTY = Math.round(GH * 0.367);
+const DBY = Math.round(GH * 0.587);
+const DH  = DBY - DTY;
+const WT  = 10, RIM = 16;
+const P3X = 10, P3Y = -14;
 
 // Character: left side, elevated dock
-const CHAR_CX=120, CHAR_CY=450;
-const LX=165, LY=440;   // launch point (character's hands)
+const CHAR_CX = Math.round(GW * 0.308);
+const CHAR_CY = Math.round(GH * 0.533);
+const LX = Math.round(GW * 0.423);
+const LY = Math.round(GH * 0.521);
 
 // Slingshot
-const MAX_PX=90, MAX_PY=130;
-const FACTOR_X=0.048;   // horizontal — small to prevent overshoot
-const FACTOR_Y=0.25;    // vertical   — larger for high arcs
+const MAX_PX = Math.round(GW * 0.231);
+const MAX_PY = Math.round(GH * 0.154);
+const FACTOR_X = 0.048;
+const FACTOR_Y = 0.25;
+
+// Background layout
+const DOCK_Y = Math.round(GH * 0.581);
+const DOCK_W = Math.round(GW * 0.482);
+const STEP_Y = Math.round(GH * 0.604);
 
 // ── Physics Bodies ────────────────────────────────────────────
 const mkS=(x,y,w,h)=>Bodies.rectangle(x,y,w,h,{isStatic:true,friction:0.65,restitution:0.18});
-const dumpL  = mkS(210,       (DTY+DBY)/2,  WT,  DH+RIM*2);
-const dumpR  = mkS(380,       (DTY+DBY)/2,  WT,  DH+RIM*2);
-const dumpBt = mkS(295,       500,           170, WT);
-const ground = mkS(GW/2,      GH+25,         GW*2,50);
-const wallL  = mkS(-25,       GH/2,          50,  GH*2);
-const wallR  = mkS(GW+25,     GH/2,          50,  GH*2);
+const dumpL  = mkS(DLX - WT/2,    (DTY+DBY)/2, WT,   DH+RIM*2);
+const dumpR  = mkS(DRX + WT/2,    (DTY+DBY)/2, WT,   DH+RIM*2);
+const dumpBt = mkS((DLX+DRX)/2,   DBY + WT/2,  DW,   WT);
+const ground = mkS(GW/2,           GH+25,        GW*2, 50);
+const wallL  = mkS(-25,            GH/2,          50,  GH*2);
+const wallR  = mkS(GW+25,          GH/2,          50,  GH*2);
 World.add(world,[dumpL,dumpR,dumpBt,ground,wallL,wallR]);
 
 // ── Items ─────────────────────────────────────────────────────
@@ -68,10 +80,10 @@ const ITEMS=[
   {name:'Barrel',shape:'c',r:21,hl:'#883300'},
 ];
 
-// ── Stars (seeded once, no per-frame random) ──────────────────
+// ── Stars (seeded — must be after GW/GH) ─────────────────────
 const STARS=Array.from({length:28},(_,i)=>({
   x:((i*137+53)%GW),
-  y:((i*97+31)%280)+10,
+  y:((i*97+31)%Math.round(GH*0.35))+10,
   r:0.7+((i*31)%10)/14,
   a:0.25+((i*53)%10)/22,
 }));
@@ -135,7 +147,7 @@ function arcPts(vx,vy,n=70){
 }
 function isInDump(b){
   const p=b.position;
-  return p.x>215&&p.x<375&&p.y>DTY-10&&p.y<DBY+20;
+  return p.x>DLX&&p.x<DRX&&p.y>DTY-10&&p.y<DBY+20;
 }
 function spawnP(x,y,color,n=8){
   for(let i=0;i<n;i++){
@@ -324,44 +336,46 @@ function drawBG(){
   ctx.globalAlpha=1;
 
   // Floodlight glow above dumpster
-  const gl=ctx.createRadialGradient(295,265,0,295,265,95);
+  const glCX=(DLX+DRX)/2, glCY=DTY-45;
+  const gl=ctx.createRadialGradient(glCX,glCY,0,glCX,glCY,95);
   gl.addColorStop(0,'rgba(255,220,100,0.14)');gl.addColorStop(1,'rgba(255,220,100,0)');
-  ctx.fillStyle=gl;ctx.beginPath();ctx.arc(295,265,95,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=gl;ctx.beginPath();ctx.arc(glCX,glCY,95,0,Math.PI*2);ctx.fill();
 
   // Loading dock platform (left side, raised)
-  ctx.fillStyle='#252830';ctx.fillRect(0,490,188,GH-490);
-  // Dock surface edge strip (bright metal trim)
-  const trim=ctx.createLinearGradient(0,488,0,495);
+  ctx.fillStyle='#252830';ctx.fillRect(0,DOCK_Y,DOCK_W,GH-DOCK_Y);
+  // Dock surface edge strip
+  const trim=ctx.createLinearGradient(0,DOCK_Y-2,0,DOCK_Y+5);
   trim.addColorStop(0,'#5a6070');trim.addColorStop(1,'#2a2e38');
-  ctx.fillStyle=trim;ctx.fillRect(0,488,188,7);
-  // Dock face (the vertical step down)
-  ctx.fillStyle='#1e2128';ctx.fillRect(185,490,5,22);
+  ctx.fillStyle=trim;ctx.fillRect(0,DOCK_Y-2,DOCK_W,7);
+  // Dock face (vertical step down)
+  ctx.fillStyle='#1e2128';ctx.fillRect(DOCK_W-3,DOCK_Y,5,STEP_Y-DOCK_Y);
 
   // Asphalt ground (right side, slightly lower)
-  ctx.fillStyle='#1a1d22';ctx.fillRect(188,510,GW-188,GH-510);
+  ctx.fillStyle='#1a1d22';ctx.fillRect(DOCK_W,STEP_Y,GW-DOCK_W,GH-STEP_Y);
   // Asphalt texture lines
   ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;
-  [530,555,580,615,660,710,760].forEach(y=>{
-    ctx.beginPath();ctx.moveTo(188,y);ctx.lineTo(GW,y);ctx.stroke();
+  [.628,.658,.687,.729,.782,.841,.901].forEach(t=>{
+    const y=Math.round(GH*t);
+    if(y<GH){ctx.beginPath();ctx.moveTo(DOCK_W,y);ctx.lineTo(GW,y);ctx.stroke();}
   });
 
   // Lamp post above dumpster
+  const lampX=DRX-5, lampTop=DTY-42;
   ctx.strokeStyle='#3a3e48';ctx.lineWidth=4;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(355,510);ctx.lineTo(355,268);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(355,268);ctx.lineTo(308,268);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(lampX,STEP_Y);ctx.lineTo(lampX,lampTop);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(lampX,lampTop);ctx.lineTo(lampX-47,lampTop);ctx.stroke();
   // Lamp head
-  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(304,270,7,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(255,230,120,0.9)';ctx.beginPath();ctx.arc(304,270,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#888';ctx.beginPath();ctx.arc(lampX-51,lampTop+2,7,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,230,120,0.9)';ctx.beginPath();ctx.arc(lampX-51,lampTop+2,4,0,Math.PI*2);ctx.fill();
 }
 
 // ── Dumpster ──────────────────────────────────────────────────
 function drawDumpsterBack(){
-  // Dark interior visible through top + semi-transparent front
   const ig=ctx.createLinearGradient(0,DTY,0,DBY);
   ig.addColorStop(0,'#07100a');ig.addColorStop(1,'#101c0e');
   ctx.fillStyle=ig;ctx.fillRect(DLX+WT,DTY,DW-WT*2,DH);
 
-  // Right-side 3D face (parallelogram)
+  // Right-side 3D face
   ctx.beginPath();
   ctx.moveTo(DRX,DTY);ctx.lineTo(DRX+P3X,DTY+P3Y);
   ctx.lineTo(DRX+P3X,DBY+P3Y);ctx.lineTo(DRX,DBY);
@@ -371,7 +385,7 @@ function drawDumpsterBack(){
   ctx.fillStyle=rg;ctx.fill();
   ctx.strokeStyle='#0c1c0a';ctx.lineWidth=1.5;ctx.stroke();
 
-  // Top rim parallelogram (shows opening depth)
+  // Top rim parallelogram
   ctx.beginPath();
   ctx.moveTo(DLX,DTY);ctx.lineTo(DLX+P3X,DTY+P3Y);
   ctx.lineTo(DRX+P3X,DTY+P3Y);ctx.lineTo(DRX,DTY);
@@ -384,7 +398,7 @@ function drawDumpsterBack(){
 
 function drawDumpsterFront(alpha){
   ctx.save();ctx.globalAlpha=alpha;
-  const cx=(DLX+DRX)/2;  // =295
+  const cx=(DLX+DRX)/2;
 
   // Main body gradient
   const bg=ctx.createLinearGradient(DLX,0,DRX,0);
@@ -434,7 +448,7 @@ function drawDumpsterFront(alpha){
     ctx.strokeStyle='#2a4820';ctx.lineWidth=1;ctx.stroke();
   });
 
-  // Paint chips / wear
+  // Paint chips
   [[DLX+28,DTY+50,14,4,'rgba(0,0,0,0.4)','#1a3818'],
    [DRX-40,DBY-72, 9,3,'rgba(0,0,0,0.4)','#1a3818'],
    [cx-20,  DTY+36,16,5,'rgba(0,0,0,0.35)','#1a3818']].forEach(([x,y,w,h,shadow,base])=>{
@@ -483,14 +497,11 @@ function drawCharacter(){
   const cx=CHAR_CX,cy=CHAR_CY,HR=22;
   const shirt=charState==='aiming'?'#cc2222':charState==='throwing'?'#22aa44':'#2255cc';
 
-  // Shadow on dock
   ctx.fillStyle='rgba(0,0,0,0.35)';
   ctx.beginPath();ctx.ellipse(cx,cy+44,20,6,0,0,Math.PI*2);ctx.fill();
 
-  // Torso
   ctx.fillStyle=shirt;ctx.beginPath();ctx.ellipse(cx,cy+HR+14,13,19,0,0,Math.PI*2);ctx.fill();
 
-  // Arms
   ctx.strokeStyle='#f5c587';ctx.lineWidth=7;ctx.lineCap='round';
   if(charState==='throwing'){
     ctx.beginPath();ctx.moveTo(cx-8,cy+HR+6);ctx.lineTo(cx+18,cy-8);ctx.stroke();
@@ -504,7 +515,6 @@ function drawCharacter(){
     ctx.beginPath();ctx.moveTo(cx+8,cy+HR+6);ctx.lineTo(cx+24,cy+HR+26);ctx.stroke();
   }
 
-  // Legs
   ctx.strokeStyle='#334466';ctx.lineWidth=8;ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(cx-5,cy+HR+32);ctx.lineTo(cx-8,cy+HR+42);ctx.stroke();
   ctx.beginPath();ctx.moveTo(cx+5,cy+HR+32);ctx.lineTo(cx+8,cy+HR+42);ctx.stroke();
@@ -512,7 +522,6 @@ function drawCharacter(){
   ctx.beginPath();ctx.ellipse(cx-10,cy+HR+44,9,4,.2,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.ellipse(cx+10,cy+HR+44,9,4,-.2,0,Math.PI*2);ctx.fill();
 
-  // Head
   ctx.fillStyle='#f5c587';ctx.beginPath();ctx.arc(cx,cy,HR,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#d4a060';ctx.lineWidth=1.5;ctx.stroke();
   ctx.fillStyle='#3d2200';ctx.beginPath();ctx.arc(cx,cy-HR*.32,HR*.82,Math.PI,0);ctx.fill();
@@ -544,7 +553,6 @@ function drawCharacter(){
     ctx.beginPath();ctx.arc(cx,cy+5,7,.1,Math.PI-.1);ctx.stroke();
   }
 
-  // Sweat drop when pulling hard
   if(charState==='aiming'){
     const pd=Math.hypot(dragPos.x-LX,dragPos.y-LY)/Math.sqrt(MAX_PX*MAX_PX+MAX_PY*MAX_PY);
     if(pd>.55){
@@ -595,28 +603,28 @@ function drawParticles(){
 
 // ── HUD ───────────────────────────────────────────────────────
 function drawHUD(){
-  // Score
+  const hudY1=Math.round(GH*0.052);
+  const hudY2=Math.round(GH*0.073);
+
   ctx.fillStyle='#ffd700';ctx.font='bold 30px Arial';ctx.textAlign='left';
-  ctx.fillText(score.toLocaleString(),14,44);
-  ctx.fillStyle='#aaa';ctx.font='13px Arial';ctx.fillText('LVL '+level,14,62);
+  ctx.fillText(score.toLocaleString(),14,hudY1);
+  ctx.fillStyle='#aaa';ctx.font='13px Arial';ctx.fillText('LVL '+level,14,hudY2);
 
-  // Thrown counter
   ctx.textAlign='right';ctx.fillStyle='#ccc';ctx.font='13px Arial';
-  ctx.fillText(thrown+'/'+perLevel+' thrown',GW-14,44);
+  ctx.fillText(thrown+'/'+perLevel+' thrown',GW-14,hudY1);
   ctx.fillStyle=inDump>0?'#44ff88':'#ff6666';
-  ctx.fillText(inDump+' in dumpster',GW-14,62);
+  ctx.fillText(inDump+' in dumpster',GW-14,hudY2);
 
-  // Combo
   if(combo>=2){
     ctx.textAlign='center';
     const pulse=1+.07*Math.sin(Date.now()/100);
-    ctx.save();ctx.translate(GW/2,82);ctx.scale(pulse,pulse);
+    ctx.save();ctx.translate(GW/2,Math.round(GH*0.097));ctx.scale(pulse,pulse);
     ctx.fillStyle='#ff9900';ctx.font='bold '+(18+combo*2)+'px Arial';
     ctx.fillText(combo+'× COMBO!',0,0);ctx.restore();
   }
 
   // NEXT panel (top right, above dumpster)
-  const sx=316,sy=78;
+  const sx=GW-74, sy=Math.round(GH*0.092);
   const qn=Math.min(queue.length,3);
   ctx.fillStyle='rgba(0,0,0,0.6)';
   ctx.beginPath();
@@ -629,12 +637,12 @@ function drawHUD(){
     ctx.fillStyle='#666';ctx.font='9px Arial';ctx.textAlign='center';ctx.fillText(def.name,sx+27,sy+36+i*54);
   });
 
-  // Level-1 tutorial hint
   if(level===1&&(state==='IDLE'||state==='AIMING')){
     ctx.textAlign='center';ctx.fillStyle='rgba(180,210,255,0.75)';
     ctx.font='13px Arial';
-    ctx.fillText('Drag ↙ left+down to aim',GW/2-20,550);
-    ctx.fillText('Release to throw →',GW/2-20,568);
+    const hy=Math.round(GH*0.65);
+    ctx.fillText('Drag ↙ left+down to aim',GW/2-20,hy);
+    ctx.fillText('Release to throw →',GW/2-20,hy+18);
   }
 }
 
@@ -715,7 +723,6 @@ function tick(ts){
   drawBG();
   drawDumpsterBack();
 
-  // Items inside (drawn before front face — visible through transparency)
   liveItems.forEach(li=>{
     if(isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
   });
@@ -723,7 +730,6 @@ function tick(ts){
   drawDumpsterFront(dumpAlpha);
   drawFillBar();
 
-  // Items outside / in flight
   liveItems.forEach(li=>{
     if(!isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
   });
