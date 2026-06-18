@@ -609,18 +609,18 @@ function drawWindStreaks(){
 }
 function drawWindFlag(){
   const sx=Math.round((DLX+DRX)/2),sy=Math.round(GH*0.04);
-  const qn=Math.min(queue.length,3);
   const px=sx+52;
-  const topY=sy+4,botY=sy+qn*50+28;
+  const topY=sy+6;
+  // short stub pole — only 22px tall, no overlap with items below
   ctx.strokeStyle='#888';ctx.lineWidth=3;ctx.lineCap='butt';
-  ctx.beginPath();ctx.moveTo(px,topY);ctx.lineTo(px,botY);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(px,topY);ctx.lineTo(px,topY+22);ctx.stroke();
   const spd=Math.abs(wind),dir=Math.sign(wind)||1;
   const wave=Math.sin(Date.now()/160)*4*spd;
-  const flen=(16+spd*22)*dir;
+  const flen=(14+spd*20)*dir;
   const fc=spd>0.7?'#ff4422':spd>0.4?'#ffbb00':'#44cc88';
   ctx.fillStyle=fc;
-  ctx.beginPath();ctx.moveTo(px,topY+2);ctx.lineTo(px+flen,topY+10+wave);ctx.lineTo(px,topY+20);ctx.closePath();ctx.fill();
-  if(spd<0.08){ctx.fillStyle='#44cc88';ctx.beginPath();ctx.arc(px,topY+10,5,0,Math.PI*2);ctx.fill();}
+  ctx.beginPath();ctx.moveTo(px,topY+1);ctx.lineTo(px+flen,topY+9+wave);ctx.lineTo(px,topY+18);ctx.closePath();ctx.fill();
+  if(spd<0.08){ctx.fillStyle='#44cc88';ctx.beginPath();ctx.arc(px,topY+9,5,0,Math.PI*2);ctx.fill();}
 }
 
 // ── HUD ───────────────────────────────────────────────────────
