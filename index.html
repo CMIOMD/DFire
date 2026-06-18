@@ -50,7 +50,7 @@ const DLX = Math.round(GW * 0.49);
 const DRX = Math.round(GW * 0.92);
 const DW  = DRX - DLX;
 const DH  = DBY - DTY;
-const WT  = 10, RIM = 16;
+const WT  = 25, RIM = 16;
 const P3X = 10, P3Y = -14;
 
 // Slingshot — FACTOR_X increased to compensate for larger throw distance
@@ -836,7 +836,6 @@ function tick(ts){
     if(isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
   });
   drawDumpsterFront(dumpAlpha);
-  drawFire();
   drawFillBar();
   liveItems.forEach(li=>{
     if(!isInDump(li.body))drawItem(li.def,li.body.position.x,li.body.position.y,li.body.angle);
@@ -852,6 +851,7 @@ function tick(ts){
   if(state==='MENU')drawMenu();
   if(state==='LEVEL_END'&&fireT>=150)drawLevelEnd();
   if(state==='GAME_OVER')drawGameOver();
+  drawFire();
 
   ctx.restore();
   requestAnimationFrame(tick);
