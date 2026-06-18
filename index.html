@@ -89,7 +89,7 @@ const STARS = Array.from({length:28},(_,i)=>({
 }));
 
 // ── State ─────────────────────────────────────────────────────
-let state='MENU', score=0, level=1, combo=0;
+let state='MENU', score=0, level=1;
 let thrown=0, perLevel=10, inDump=0;
 let liveItems=[], queue=[], curDef=null, fillPct=0;
 let dragging=false, dragPos={x:LX,y:LY};
@@ -176,7 +176,7 @@ function endLevel(){
 }
 function startLevel(){
   liveItems.forEach(li=>World.remove(world,li.body));
-  liveItems=[];thrown=0;inDump=0;combo=0;fillPct=0;
+  liveItems=[];thrown=0;inDump=0;fillPct=0;
   fireT=0;fireParticles=[];
   perLevel=8+level*2;fillQ();nextItem();
 }
@@ -208,8 +208,8 @@ Events.on(engine,'collisionStart',evt=>{
         sfxImpact(spd);
       }
       if(!b._landed&&isInDump(b)){
-        b._landed=true;inDump++;combo++;
-        score+=100*level*Math.min(combo,6);
+        b._landed=true;inDump++;
+        score+=100*level;
         spawnP(b.position.x,DTY+12,'#ffd700',14);
         sfxSuccess();
       }
@@ -690,15 +690,6 @@ function drawHUD(){
   ctx.fillText(thrown+'/'+perLevel+' thrown',12,y2+18);
   ctx.fillStyle=inDump>0?'#44ff88':'#ff6666';
   ctx.fillText(inDump+' in dumpster',12,y2+34);
-
-  // Combo
-  if(combo>=2){
-    ctx.textAlign='center';
-    const pulse=1+.07*Math.sin(Date.now()/100);
-    ctx.save();ctx.translate(LX+Math.round((DLX-LX)/2), Math.round(GH*0.10));ctx.scale(pulse,pulse);
-    ctx.fillStyle='#ff9900';ctx.font='bold '+(16+combo*2)+'px Arial';
-    ctx.fillText(combo+'× COMBO!',0,0);ctx.restore();
-  }
 
   // NEXT panel — centered above dumpster
   const sx=Math.round((DLX+DRX)/2), sy=Math.round(GH*0.04);
