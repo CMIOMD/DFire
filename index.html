@@ -51,7 +51,7 @@ const DW  = DRX - DLX;
 const DH  = DBY - DTY;
 const WT  = 25, RIM = 16;
 const P3X = 10, P3Y = -14;
-const ZONE_H = Math.round(DH / 4);        // height of each compaction zone
+const ZONE_H = Math.round(DH / 3);        // height of each compaction zone (3 larger zones)
 
 // Slingshot — pull stays on-screen: LX - MAX_PX ≈ 8px
 const MAX_PX   = Math.round(GW * 0.28);
@@ -115,6 +115,10 @@ let fireT=0, fireParticles=[];
 let overflowTimer=0;      // frames items have been at/above rim
 let warnPulse=0;          // oscillator for danger glow
 let compactPending=[];    // zones queued for compaction {zTop,zBot,flashT,items[]}
+let thrown=0, baseItems=10;
+let allStillFrames=0, tickFrame=0;
+let lastCompactFrame=-999;
+let bonusBatch=0;
 
 // ── Audio ─────────────────────────────────────────────────────
 let audioCtx;
@@ -189,11 +193,11 @@ function isInDump(b){
 // ── Zone Compaction ───────────────────────────────────────────
 function checkZones(){
   const innerW=DW-WT*2;
-  for(let z=0;z<4;z++){
+  for(let z=0;z<3;z++){
     const zBot=DBY-z*ZONE_H;
     const zTop=zBot-ZONE_H;
-    // skip zones already pending or compacted
     if(compactPending.some(cp=>Math.abs(cp.zBot-zBot)<2))continue;
+    if(tickFrame-lastCompactFrame<300)continue;
     let coverArea=0;
     liveItems.forEach(li=>{
       if(!isInDump(li.body)||li.body._compacted)return;
@@ -206,37 +210,35 @@ function checkZones(){
       if(overlap>0)coverArea+=bw*overlap;
     });
     const coverage=coverArea/(innerW*ZONE_H);
-    if(coverage>=0.62){
-      // collect items whose centers are in this zone
+    if(coverage>=0.82){
+      // only remove items in the bottom 40% of the zone
+      const cutY=zTop+ZONE_H*0.6;
       const zoneItems=liveItems.filter(li=>
         isInDump(li.body)&&!li.body._compacted&&
-        li.body.position.y>=zTop&&li.body.position.y<=zBot
+        li.body.position.y>cutY&&li.body.position.y<=zBot
       );
       if(zoneItems.length===0)continue;
       zoneItems.forEach(li=>li.body._compacted=true);
-      compactPending.push({zTop,zBot,flashT:60,items:zoneItems});
+      compactPending.push({zTop:cutY,zBot,flashT:90,items:zoneItems});
     }
   }
 }
 function processCompaction(cp){
-  // Remove physics bodies for items in this zone
   cp.items.forEach(li=>{
     World.remove(world,li.body);
     liveItems=liveItems.filter(x=>x!==li);
   });
-  // Add thin compressed debris block at bottom of zone
-  const blockY=cp.zBot-4;
+  const blockY=cp.zBot-3;
   const blockBody=Bodies.rectangle(
-    (DLX+DRX)/2, blockY, DW-WT*2, 8,
+    (DLX+DRX)/2, blockY, DW-WT*2, 6,
     {isStatic:true,friction:0.8,restitution:0.05,label:'compacted'}
   );
   World.add(world,blockBody);
   compactedBlocks.push({body:blockBody});
-  // Score bonus
-  const bonus=800*level;
+  lastCompactFrame=tickFrame;
+  const bonus=500*level;
   score+=bonus;
-  // Pop text
-  popTexts.push({x:(DLX+DRX)/2,y:cp.zTop+ZONE_H/2,text:'PACKED! +'+bonus,life:1,color:'#ffd700'});
+  popTexts.push({x:(DLX+DRX)/2,y:(cp.zTop+cp.zBot)/2,text:'COMPACTED! +'+bonus,life:1.4,color:'#ffd700'});
   sfxCompact();
 }
 function spawnPop(x,y,text,color='#ffd700'){
@@ -282,8 +284,6 @@ function fillQ(){
   while(queue.length<5)queue.push(pool[Math.floor(Math.random()*pool.length)]);
 }
 function nextItem(){
-  // Check for zone compactions before loading next item
-  checkZones();
   windTarget=(Math.random()*2-1)*Math.min(0.15+level*0.06,0.9);
   fillQ();curDef=queue.shift();
   dragging=false;dragPos={x:LX,y:LY};state='IDLE';
@@ -304,6 +304,7 @@ function startLevel(){
   compactedBlocks=[];compactPending=[];popTexts=[];
   overflowTimer=0;warnPulse=0;
   fireT=0;fireParticles=[];
+  baseItems=8+level*2;thrown=0;allStillFrames=0;bonusBatch=0;lastCompactFrame=-999;
   fillQ();nextItem();
 }
 function startGame(){level=1;score=0;startLevel();}
@@ -319,7 +320,7 @@ function doLaunch(){
   body._def=def;body._landed=false;
   World.add(world,body);
   liveItems.push({body,def});
-  itemsThrown++;throwT=22;charState='throwing';
+  itemsThrown++;thrown++;throwT=22;charState='throwing';
   sfxLaunch();curDef=null;state='FLYING';
 }
 
@@ -551,7 +552,7 @@ function drawDumpsterBack(){
   // Zone boundary lines (faint horizontal guides inside dumpster)
   ctx.save();
   ctx.strokeStyle='rgba(255,255,255,0.10)';ctx.lineWidth=1;ctx.setLineDash([6,10]);
-  for(let z=1;z<4;z++){
+  for(let z=1;z<3;z++){
     const zy=DBY-z*ZONE_H;
     ctx.beginPath();ctx.moveTo(DLX+WT,zy);ctx.lineTo(DRX-WT,zy);ctx.stroke();
   }
@@ -560,9 +561,9 @@ function drawDumpsterBack(){
   // Flash compacting zones
   compactPending.forEach(cp=>{
     if(cp.flashT>0){
-      const a=(cp.flashT/60)*0.38;
+      const a=(cp.flashT/90)*0.5;
       ctx.fillStyle=`rgba(255,200,0,${a})`;
-      ctx.fillRect(DLX+WT,cp.zTop,DW-WT*2,ZONE_H);
+      ctx.fillRect(DLX+WT,cp.zTop,DW-WT*2,cp.zBot-cp.zTop);
     }
   });
 
@@ -668,7 +669,7 @@ function drawZoneBars(){
   ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(bx,DTY,barW,DH);
   ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.strokeRect(bx,DTY,barW,DH);
 
-  for(let z=0;z<4;z++){
+  for(let z=0;z<3;z++){
     const zBot=DBY-z*ZONE_H, zTop=zBot-ZONE_H;
     let coverArea=0;
     liveItems.forEach(li=>{
@@ -683,12 +684,12 @@ function drawZoneBars(){
     });
     // also count compacted blocks in this zone
     compactedBlocks.forEach(cb=>{
-      if(cb.body.position.y>=zTop&&cb.body.position.y<=zBot)coverArea+=innerW*8;
+      if(cb.body.position.y>=zTop&&cb.body.position.y<=zBot)coverArea+=innerW*6;
     });
     const pct=Math.min(1,coverArea/(innerW*ZONE_H));
     if(pct>0){
       const fillH=ZONE_H*pct;
-      const fc=pct>=0.62?'#ff6600':pct>=0.38?'#ffcc00':'#44cc88';
+      const fc=pct>=0.82?'#ff6600':pct>=0.55?'#ffcc00':'#44cc88';
       ctx.fillStyle=fc;
       ctx.fillRect(bx+1,zBot-fillH,barW-2,fillH);
     }
@@ -924,6 +925,13 @@ function drawHUD(){
     ctx.fillText(eff+'% accuracy',12,y2+34);
   }
 
+  // Throws remaining
+  const allotment=baseItems+bonusBatch*3;
+  const throwsLeft=Math.max(0,allotment-thrown);
+  ctx.fillStyle=throwsLeft<=3?'#ff9944':'#88ccff';
+  ctx.font='bold 12px Arial';ctx.textAlign='left';
+  ctx.fillText('Throws: '+throwsLeft+(bonusBatch>0?' (BONUS)':''),12,y2+50);
+
   // Danger warning
   if(overflowTimer>30){
     ctx.save();
@@ -1037,6 +1045,7 @@ function drawGameOver(){
 // ── Main Loop ─────────────────────────────────────────────────
 let lastT=0;
 function tick(ts){
+  tickFrame++;
   const dt=Math.min(ts-lastT,50);lastT=ts;
 
   wind+=(windTarget-wind)*0.012;
@@ -1059,13 +1068,29 @@ function tick(ts){
   if(charState!=='throwing'&&state==='AIMING')charState='aiming';
   else if(charState!=='throwing'&&state!=='AIMING')charState='idle';
 
+  // Stillness tracking — run zone check after 2.5s all-still in IDLE
+  const allStill=liveItems.length>0&&liveItems.every(li=>li.body.speed<0.3);
+  allStillFrames=allStill?allStillFrames+1:0;
+  if(allStillFrames===150&&state==='IDLE')checkZones();
+
   if(state==='FLYING'){
     const fly=liveItems.filter(li=>!li.body._landed&&li.body.position.y<GH-20&&li.body.speed>.4);
     if(!fly.length){waitT=55;state='WAIT';}
   }
   if(state==='WAIT'){
     waitT--;
-    if(waitT<=0)nextItem();
+    if(waitT<=0){
+      const allotment=baseItems+bonusBatch*3;
+      if(thrown<allotment){
+        nextItem();
+      } else if(bonusBatch<2&&overflowTimer===0){
+        bonusBatch++;
+        popTexts.push({x:GW/2,y:GH*0.45,text:'BONUS THROWS! x'+bonusBatch,life:2,color:'#ffd700'});
+        nextItem();
+      } else {
+        triggerFull();
+      }
+    }
   }
 
   // Compaction flash countdown → process when done
@@ -1125,7 +1150,6 @@ function tick(ts){
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
-
 </script>
 </body>
 </html>
